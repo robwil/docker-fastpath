@@ -219,8 +219,8 @@ end:
         debug("No credentials\n");
     }
 
+    char* docker_host = NULL;
     const char* s = getenv("DOCKER_HOST");
-    char* host = "";
     if (s == NULL) {
         // If no DOCKER_HOST, default to unix socket connection
         curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, "/var/run/docker.sock");
@@ -228,16 +228,16 @@ end:
     } else {
         char* last_slash = strrchr(s, '/');
         if (last_slash != NULL) {
-            host = last_slash + 1;
+            docker_host = last_slash + 1;
         }
-        debug("using DOCKER_HOST parsed as %s\n", host);
+        debug("using DOCKER_HOST parsed as %s\n", docker_host);
     }
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_function);
 
-    if (host) {
-        sprintf(url, "http://%s/v1.18/images/create?fromImage=%s&tag=%s", host, image_name, tag);
+    if (docker_host) {
+        sprintf(url, "http://%s/v1.18/images/create?fromImage=%s&tag=%s", docker_host, image_name, tag);
     } else {
         sprintf(url, "http://v1.18/images/create?fromImage=%s&tag=%s", image_name, tag);
     }
