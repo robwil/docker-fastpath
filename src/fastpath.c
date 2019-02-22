@@ -175,9 +175,7 @@ int fetch_image(char *image_name, char *tag, char *user, char *pass) {
         if (homedir) {
             debug("Trying to fetch credentials from Docker client configuration\n");
             sprintf(filename, "%s/%s", homedir, CONFIG_FILE_PATH);
-            debug('hereA\n');
             fp = fopen(filename, "r");
-            debug('hereB\n');
             if (fp == NULL) {
                 debug("Cannot open Docker client configuration file: %s\n", strerror(errno));
             } else {
@@ -221,30 +219,29 @@ end:
         debug("No credentials\n");
     }
 
-    debug("here0\n");
     const char* s = getenv("DOCKER_HOST");
     char* host = "";
-    debug("here1\n");
     if (s == NULL) {
-        debug("here2\n");
         // If no DOCKER_HOST, default to unix socket connection
         curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, "/var/run/docker.sock");
-        debug("here3\n");
+        debug("defaulting to /var/run/docker.sock connection\n");
     } else {
-        debug("here4\n");
-        first_slash = strchr(s, '/');
-        debug("here5\n");
-        if (first_slash != NULL) {
-            debug("here6\n");
-            host = first_slash;
+        char* last_slash = strrchr(s, '/');
+        if (last_slash != NULL) {
+            host = last_slash + 1;
         }
+        debug("using DOCKER_HOST parsed as %s\n", host);
     }
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_function);
 
-    // input sanitation?
-    sprintf(url, "http://%sv1.18/images/create?fromImage=%s&tag=%s", host, image_name, tag);
+    if (host) {
+        sprintf(url, "http://%s/v1.18/images/create?fromImage=%s&tag=%s", host, image_name, tag);
+    } else {
+        sprintf(url, "http://v1.18/images/create?fromImage=%s&tag=%s", image_name, tag);
+    }
+
     curl_easy_setopt(curl, CURLOPT_URL, url);
 
     debug("Trying to fetch %s:%s\n", image_name, tag);
