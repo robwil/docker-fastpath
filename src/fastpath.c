@@ -220,29 +220,47 @@ end:
     }
 
     char* docker_host = NULL;
-    const char* s = getenv("DOCKER_HOST");
-    if (s == NULL) {
+    const char* docker_host_env = getenv("DOCKER_HOST");
+    if (docker_host_env) {
+        // DOCKER_HOST is in format tcp://ip:port
+        // we just want the ip:port part
+        char* last_slash = strrchr(docker_host_env, '/');
+        if (last_slash != NULL) {
+            docker_host = last_slash + 1;
+            debug("using DOCKER_HOST parsed as %s\n", docker_host);
+        }
+    } else {
         // If no DOCKER_HOST, default to unix socket connection
         curl_easy_setopt(curl, CURLOPT_UNIX_SOCKET_PATH, "/var/run/docker.sock");
         debug("defaulting to /var/run/docker.sock connection\n");
-    } else {
-        char* last_slash = strrchr(s, '/');
-        if (last_slash != NULL) {
-            docker_host = last_slash + 1;
-        }
-        debug("using DOCKER_HOST parsed as %s\n", docker_host);
     }
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
     curl_easy_setopt(curl, CURLOPT_POSTFIELDS, "");
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_function);
 
     if (docker_host) {
-        sprintf(url, "http://%s/v1.18/images/create?fromImage=%s&tag=%s", docker_host, image_name, tag);
+        sprintf(url, "https://%s/v1.18/images/create?fromImage=%s&tag=%s", docker_host, image_name, tag);
+        curl_easy_setopt(curl, CURLOPT_URL, url);
+        // also need to setup SSL configuration for remote docker
+        const char* cert_path = getenv("DOCKER_CERT_PATH");
+        if (cert_path) {
+            // CLI parameters look like --cert $DOCKER_CERT_PATH/cert.pem --key $DOCKER_CERT_PATH/key.pem -k
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0);
+            curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0);
+            curl_easy_setopt(curl, CURLOPT_CAINFO, NULL);
+            char filename2[BUFSIZE];
+            sprintf(filename2, "%s/%s", cert_path, "cert.pem");
+            debug("using curl SSL cert %s\n", filename2);
+            curl_easy_setopt(curl, CURLOPT_SSLCERT, filename2);
+            char filename3[BUFSIZE];
+            sprintf(filename3, "%s/%s", cert_path, "key.pem");
+            debug("using curl SSL key %s\n", filename3);
+            curl_easy_setopt(curl, CURLOPT_SSLKEY, filename3);
+        }
     } else {
         sprintf(url, "http://v1.18/images/create?fromImage=%s&tag=%s", image_name, tag);
+        curl_easy_setopt(curl, CURLOPT_URL, url);
     }
-
-    curl_easy_setopt(curl, CURLOPT_URL, url);
 
     debug("Trying to fetch %s:%s\n", image_name, tag);
     debug("Url: %s\n", url);
